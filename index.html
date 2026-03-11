@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LUMINA — Text to Video</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #08090c;
+    --surface: #0f1117;
+    --surface2: #161b27;
+    --border: rgba(255,255,255,0.07);
+    --accent: #e8ff47;
+    --accent2: #ff6b35;
+    --text: #f0f0f0;
+    --muted: #5a6070;
+    --glow: rgba(232,255,71,0.15);
+  }
+
+  html, body {
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    overflow-x: hidden;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(232,255,71,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(232,255,71,0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Radial glow */
+  body::after {
+    content: '';
+    position: fixed;
+    top: -20%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 900px;
+    height: 600px;
+    background: radial-gradient(ellipse, rgba(232,255,71,0.06) 0%, transparent 65%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* ── Header ── */
+  header {
+    padding: 48px 0 0;
+    text-align: center;
+  }
+
+  .badge {
+    display: inline-block;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid rgba(232,255,71,0.3);
+    border-radius: 100px;
+    padding: 5px 14px;
+    margin-bottom: 28px;
+    animation: fadeIn 0.8s ease both;
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: clamp(44px, 8vw, 80px);
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+    animation: slideUp 0.8s cubic-bezier(.16,1,.3,1) 0.1s both;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .subtitle {
+    margin-top: 18px;
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    animation: fadeIn 0.8s ease 0.3s both;
+  }
+
+  /* ── Main Card ── */
+  .card {
+    margin: 48px 0 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    overflow: hidden;
+    animation: slideUp 0.8s cubic-bezier(.16,1,.3,1) 0.2s both;
+  }
+
+  .card-inner { padding: 36px; }
+
+  /* ── Prompt Section ── */
+  .prompt-label {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .prompt-wrapper {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface2);
+    transition: border-color 0.2s;
+  }
+
+  .prompt-wrapper:focus-within {
+    border-color: rgba(232,255,71,0.4);
+    box-shadow: 0 0 0 3px var(--glow);
+  }
+
+  textarea {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    line-height: 1.7;
+    padding: 18px 20px 56px;
+    resize: none;
+    min-height: 130px;
+  }
+
+  textarea::placeholder { color: var(--muted); }
+
+  .prompt-actions {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    display: flex;
+    gap: 8px;
+  }
+
+  .example-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .example-btn:hover {
+    color: var(--accent);
+    border-color: rgba(232,255,71,0.3);
+  }
+
+  /* ── Settings Grid ── */
+  .settings {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 20px;
+  }
+
+  .setting-group label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  select, input[type="number"], input[type="range"] {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 9px 12px;
+    outline: none;
+    appearance: none;
+    transition: border-color 0.2s;
+  }
+
+  select:focus, input[type="number"]:focus {
+    border-color: rgba(232,255,71,0.4);
+  }
+
+  /* ── Generate Button ── */
+  .generate-btn {
+    width: 100%;
+    margin-top: 28px;
+    padding: 18px;
+    background: var(--accent);
+    color: #08090c;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .generate-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.2), transparent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .generate-btn:hover::before { opacity: 1; }
+  .generate-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 30px rgba(232,255,71,0.3); }
+  .generate-btn:active { transform: translateY(0); }
+  .generate-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  /* ── Negative Prompt Toggle ── */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 16px;
+    cursor: pointer;
+    width: fit-content;
+  }
+
+  .toggle-row input { width: auto; }
+  .toggle-label { font-size: 11px; color: var(--muted); letter-spacing: 0.05em; }
+
+  #negativeSection { margin-top: 14px; display: none; }
+
+  /* ── Status / Progress ── */
+  .status-area {
+    padding: 0 36px 36px;
+    display: none;
+  }
+
+  .status-divider {
+    height: 1px;
+    background: var(--border);
+    margin-bottom: 28px;
+  }
+
+  .progress-label {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .progress-bar-bg {
+    height: 3px;
+    background: var(--surface2);
+    border-radius: 100px;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 100px;
+    width: 0%;
+    transition: width 0.4s ease;
+  }
+
+  .status-log {
+    margin-top: 18px;
+    font-size: 11px;
+    line-height: 1.8;
+    color: var(--muted);
+  }
+
+  .log-line { animation: fadeIn 0.3s ease; }
+  .log-line.active { color: var(--accent); }
+  .log-line.done { color: #4ade80; }
+  .log-line.error { color: #f87171; }
+
+  /* ── Result ── */
+  .result-area {
+    padding: 0 36px 36px;
+    display: none;
+  }
+
+  .result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .result-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #4ade80;
+  }
+
+  .result-meta {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .video-container {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: #000;
+    position: relative;
+    aspect-ratio: 1 / 1;
+  }
+
+  .video-container video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .video-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .action-btn {
+    flex: 1;
+    padding: 11px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-decoration: none;
+    text-align: center;
+  }
+
+  .action-btn.primary {
+    background: var(--accent);
+    color: #08090c;
+    border: none;
+    font-weight: bold;
+  }
+
+  .action-btn.secondary {
+    background: none;
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+
+  .action-btn.secondary:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+  .action-btn.primary:hover { box-shadow: 0 4px 16px rgba(232,255,71,0.3); }
+
+  /* ── Error ── */
+  .error-area {
+    margin: 0 36px 36px;
+    background: rgba(248,113,113,0.08);
+    border: 1px solid rgba(248,113,113,0.2);
+    border-radius: 10px;
+    padding: 16px 20px;
+    font-size: 12px;
+    color: #f87171;
+    display: none;
+  }
+
+  /* ── API Config Banner ── */
+  .api-banner {
+    margin: 0 36px 0;
+    padding: 14px 20px;
+    background: rgba(255,107,53,0.08);
+    border: 1px solid rgba(255,107,53,0.2);
+    border-radius: 10px;
+    font-size: 11px;
+    color: var(--accent2);
+    line-height: 1.7;
+  }
+
+  .api-banner code {
+    background: rgba(255,107,53,0.15);
+    border-radius: 4px;
+    padding: 1px 6px;
+  }
+
+  /* ── Footer ── */
+  footer {
+    text-align: center;
+    padding: 48px 0 32px;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  footer a { color: var(--muted); }
+  footer a:hover { color: var(--accent); }
+
+  /* ── Animations ── */
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .pulsing { animation: pulse 1.4s ease infinite; }
+
+  /* ── Spinner ── */
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(8,9,12,0.3);
+    border-top-color: #08090c;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @media (max-width: 600px) {
+    .settings { grid-template-columns: 1fr 1fr; }
+    .card-inner { padding: 24px; }
+    .status-area, .result-area { padding: 0 24px 24px; }
+    .error-area, .api-banner { margin: 0 24px 24px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="badge">AI-Powered · Replicate API</div>
+    <h1>LUMI<span>NA</span></h1>
+    <p class="subtitle">Type a prompt. Watch it become video.</p>
+  </header>
+
+  <div class="card">
+    <!-- API Config notice -->
+    <div class="card-inner" style="padding-bottom: 0;">
+      <div class="api-banner" id="apiBanner">
+        ⚙️ Backend required — run <code>python app.py</code> locally, then set
+        <code>REPLICATE_API_TOKEN</code> in your <code>.env</code> file.
+        By default this connects to <code>http://localhost:5000</code>.
+      </div>
+    </div>
+
+    <div class="card-inner">
+      <!-- Prompt -->
+      <div class="prompt-label">Your Prompt</div>
+      <div class="prompt-wrapper">
+        <textarea id="prompt"
+          rows="4"
+          placeholder="A lone astronaut walks across a red alien desert at sunset, dust swirling around their boots, cinematic wide shot..."
+          maxlength="400"
+        ></textarea>
+        <div class="prompt-actions">
+          <button class="example-btn" onclick="setExample('cinematic')">cinematic</button>
+          <button class="example-btn" onclick="setExample('nature')">nature</button>
+          <button class="example-btn" onclick="setExample('abstract')">abstract</button>
+        </div>
+      </div>
+
+      <!-- Settings -->
+      <div class="settings">
+        <div class="setting-group">
+          <label>Resolution</label>
+          <select id="resolution">
+            <option value="512x512" selected>512 × 512</option>
+            <option value="768x512">768 × 512</option>
+            <option value="512x768">512 × 768</option>
+          </select>
+        </div>
+        <div class="setting-group">
+          <label>Frames</label>
+          <select id="frames">
+            <option value="8">8 frames</option>
+            <option value="16" selected>16 frames</option>
+            <option value="24">24 frames</option>
+            <option value="32">32 frames</option>
+          </select>
+        </div>
+        <div class="setting-group">
+          <label>Quality</label>
+          <select id="steps">
+            <option value="4" selected>Fast (4 steps)</option>
+            <option value="8">Balanced (8)</option>
+            <option value="25">High (25)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Negative prompt toggle -->
+      <label class="toggle-row">
+        <input type="checkbox" id="negToggle" onchange="toggleNeg()">
+        <span class="toggle-label">ADD NEGATIVE PROMPT</span>
+      </label>
+      <div id="negativeSection">
+        <div class="prompt-wrapper">
+          <textarea id="negativePrompt" rows="2"
+            placeholder="blurry, distorted, low quality, flickering, watermark..."
+          ></textarea>
+        </div>
+      </div>
+
+      <!-- Generate -->
+      <button class="generate-btn" id="generateBtn" onclick="generate()">
+        Generate Video
+      </button>
+    </div>
+
+    <!-- Status -->
+    <div class="status-area" id="statusArea">
+      <div class="status-divider"></div>
+      <div class="progress-label">
+        <span id="statusText" class="pulsing">Initializing...</span>
+        <span id="elapsedText">0s</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progressBar"></div>
+      </div>
+      <div class="status-log" id="statusLog"></div>
+    </div>
+
+    <!-- Error -->
+    <div class="error-area" id="errorArea"></div>
+
+    <!-- Result -->
+    <div class="result-area" id="resultArea">
+      <div class="status-divider"></div>
+      <div class="result-header">
+        <span class="result-title">✓ Video Generated</span>
+        <span class="result-meta" id="resultMeta"></span>
+      </div>
+      <div class="video-container">
+        <video id="resultVideo" controls autoplay loop muted></video>
+      </div>
+      <div class="video-actions">
+        <a id="downloadBtn" class="action-btn primary" download="lumina-video.mp4">
+          ↓ Download MP4
+        </a>
+        <button class="action-btn secondary" onclick="newVideo()">
+          ← New Prompt
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    Powered by <a href="https://replicate.com" target="_blank">Replicate</a> ·
+    Model: AnimateDiff-Lightning ·
+    Built with Flask + Vanilla JS
+  </footer>
+</div>
+
+<script>
+  const API_BASE = 'http://localhost:5000';
+
+  const examples = {
+    cinematic: "A lone astronaut walks across a red alien desert at sunset, dust swirling, cinematic wide shot, 4K dramatic lighting",
+    nature: "Time lapse of a blooming cherry blossom tree, petals falling like snow, soft morning light filtering through branches",
+    abstract: "Colorful liquid paint swirling in slow motion in a dark void, macro lens, vivid neon hues, hypnotic patterns"
+  };
+
+  let timer = null;
+  let startTime = null;
+
+  function setExample(type) {
+    document.getElementById('prompt').value = examples[type];
+    document.getElementById('prompt').focus();
+  }
+
+  function toggleNeg() {
+    document.getElementById('negativeSection').style.display =
+      document.getElementById('negToggle').checked ? 'block' : 'none';
+  }
+
+  function addLog(msg, type = '') {
+    const log = document.getElementById('statusLog');
+    const line = document.createElement('div');
+    line.className = 'log-line' + (type ? ' ' + type : '');
+    line.textContent = '› ' + msg;
+    log.appendChild(line);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function setProgress(pct) {
+    document.getElementById('progressBar').style.width = pct + '%';
+  }
+
+  function startElapsedTimer() {
+    startTime = Date.now();
+    timer = setInterval(() => {
+      const s = ((Date.now() - startTime) / 1000).toFixed(0);
+      document.getElementById('elapsedText').textContent = s + 's';
+    }, 500);
+  }
+
+  function stopElapsedTimer() {
+    clearInterval(timer);
+  }
+
+  function showSection(id, visible) {
+    document.getElementById(id).style.display = visible ? '' : 'none';
+  }
+
+  async function generate() {
+    const prompt = document.getElementById('prompt').value.trim();
+    if (!prompt) {
+      document.getElementById('prompt').focus();
+      return;
+    }
+
+    // Parse resolution
+    const [w, h] = document.getElementById('resolution').value.split('x').map(Number);
+    const numFrames = parseInt(document.getElementById('frames').value);
+    const steps = parseInt(document.getElementById('steps').value);
+    const negPrompt = document.getElementById('negToggle').checked
+      ? document.getElementById('negativePrompt').value.trim()
+      : "low quality, blurry, watermark, jittery";
+
+    // Reset UI
+    showSection('statusArea', true);
+    showSection('resultArea', false);
+    showSection('errorArea', false);
+    document.getElementById('statusLog').innerHTML = '';
+    document.getElementById('generateBtn').disabled = true;
+    document.getElementById('generateBtn').innerHTML = '<span class="spinner"></span>Generating...';
+    setProgress(5);
+    document.getElementById('statusText').textContent = 'Connecting to server...';
+    document.getElementById('statusText').classList.add('pulsing');
+    startElapsedTimer();
+
+    addLog(`Prompt: "${prompt.substring(0, 60)}..."`);
+    addLog(`Config: ${w}×${h}, ${numFrames} frames, ${steps} steps`);
+
+    try {
+      setProgress(15);
+      document.getElementById('statusText').textContent = 'Sending to Replicate...';
+      addLog('Sending request to Replicate API...', 'active');
+
+      // Simulate progress updates while waiting
+      const progressSteps = [
+        { pct: 25, msg: 'Model loaded, processing prompt...' },
+        { pct: 45, msg: 'Generating keyframes...' },
+        { pct: 65, msg: 'Rendering temporal frames...' },
+        { pct: 80, msg: 'Encoding video output...' },
+        { pct: 92, msg: 'Finalizing...' },
+      ];
+
+      let stepIdx = 0;
+      const progressInterval = setInterval(() => {
+        if (stepIdx < progressSteps.length) {
+          const step = progressSteps[stepIdx++];
+          setProgress(step.pct);
+          document.getElementById('statusText').textContent = step.msg;
+          addLog(step.msg, 'active');
+        }
+      }, 8000); // every 8s
+
+      const response = await fetch(`${API_BASE}/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          negative_prompt: negPrompt,
+          width: w,
+          height: h,
+          num_frames: numFrames,
+          num_inference_steps: steps,
+          guidance_scale: 1.0
+        })
+      });
+
+      clearInterval(progressInterval);
+      const data = await response.json();
+
+      if (!data.success) throw new Error(data.error || 'Unknown error');
+
+      setProgress(100);
+      stopElapsedTimer();
+      document.getElementById('statusText').textContent = 'Complete!';
+      document.getElementById('statusText').classList.remove('pulsing');
+      addLog(`Done in ${data.elapsed_seconds}s`, 'done');
+
+      // Show video
+      const video = document.getElementById('resultVideo');
+      video.src = data.video_url;
+      document.getElementById('downloadBtn').href = data.video_url;
+      document.getElementById('resultMeta').textContent =
+        `${data.elapsed_seconds}s · ${w}×${h} · ${numFrames} frames`;
+
+      setTimeout(() => {
+        showSection('resultArea', true);
+        showSection('statusArea', false);
+      }, 600);
+
+    } catch (err) {
+      stopElapsedTimer();
+      setProgress(0);
+      showSection('statusArea', false);
+      const errorEl = document.getElementById('errorArea');
+      errorEl.style.display = '';
+      errorEl.innerHTML = `
+        <strong>Error:</strong> ${err.message}<br><br>
+        <span style="opacity:0.7">Make sure the Flask server is running on port 5000 and your
+        REPLICATE_API_TOKEN is set in <code style="background:rgba(248,113,113,0.15);padding:1px 6px;border-radius:4px">.env</code></span>
+      `;
+    }
+
+    document.getElementById('generateBtn').disabled = false;
+    document.getElementById('generateBtn').innerHTML = 'Generate Video';
+  }
+
+  function newVideo() {
+    showSection('resultArea', false);
+    showSection('errorArea', false);
+    document.getElementById('statusLog').innerHTML = '';
+    document.getElementById('prompt').focus();
+  }
+
+  // Check server health on load
+  window.addEventListener('load', async () => {
+    try {
+      const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(2000) });
+      if (res.ok) {
+        document.getElementById('apiBanner').innerHTML =
+          '✅ Server connected — ready to generate videos.';
+        document.getElementById('apiBanner').style.color = '#4ade80';
+        document.getElementById('apiBanner').style.borderColor = 'rgba(74,222,128,0.2)';
+        document.getElementById('apiBanner').style.background = 'rgba(74,222,128,0.05)';
+      }
+    } catch {
+      // Server not running — banner already shows instructions
+    }
+  });
+
+  // Ctrl+Enter to generate
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') generate();
+  });
+</script>
+</body>
+</html>
